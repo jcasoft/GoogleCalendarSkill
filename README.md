@@ -36,20 +36,20 @@ Now go to Mycroft third party skill directory
 
     $HOME/.mycroft/mycroft.conf
 
-  "GoogleCalendarSkill": {
-    "loginEnabled": False,
-    "calendar_id": 'YOURMAILADRESS@gmail.com',
-    "maxResults": 10,
-    "gmt": '-06:00',
-    "timeZone": 'America/El_Salvador',
-    "attendees_own": 'xxxxx1@gmail.com, xxxxx2@gmail.com',
-    "attendees_family": 'xxxxx3@gmail.com, xxxxx3@gmail.com',
-    "attendees_work": 'support.mywork@gmail.com,sales.mywork@gmail.com,info.mywork@icloud.com'
-    "reminders_email": 1440,  		# in minutes --> 24 *60
-    "reminders_popup": 10,    		# in minutes
-    "default_duration": 2,		# Default duration of appointments, in hours
-    "time_format": 12 			# Options are 12h and 24h
-  }
+	"GoogleCalendarSkill": {
+		"loginEnabled": False,
+		"calendar_id": 'YOURMAILADRESS@gmail.com',
+		"maxResults": 10,
+		"gmt": '-06:00',
+		"timeZone": 'America/El_Salvador',
+		"attendees_own": 'xxxxx1@gmail.com, xxxxx2@gmail.com',
+		"attendees_family": 'xxxxx3@gmail.com, xxxxx3@gmail.com',
+		"attendees_work": 'support.mywork@gmail.com,sales.mywork@gmail.com,info.mywork@icloud.com'
+		"reminders_email": 1440,  		# in minutes --> 24 *60
+		"reminders_popup": 10,    		# in minutes
+		"default_duration": 2,		# Default duration of appointments, in hours
+		"time_format": 12 			# Options are 12h and 24h
+	}
 
 
 > **Note:**
