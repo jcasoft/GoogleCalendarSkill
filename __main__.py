@@ -81,10 +81,13 @@ for event in events:
 
     start = start[:22]+start[(22+1):]
 
-    if '+' in start:
-	start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S+%f")
+    if 'T' in start:
+        if '+' in start:
+	    start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S+%f")
+        else:
+	    start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S-%f")
     else:
-	start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S-%f")
+	start = datetime.datetime.strptime(start,"%Y-%m-%d")
 
     startHour = ("{:d}:{:02d}".format(start.hour, start.minute))
     startHour = time.strptime(startHour,"%H:%M")
