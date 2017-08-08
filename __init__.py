@@ -491,7 +491,7 @@ class GoogleCalendarSkill(MycroftSkill):
         events.sort(key=lambda x: x['start'])
         return events
 
-    def handle_next_event(self, message):
+    def handle_next_event(self, message, brief=True):
 	if not loggedIn():
 		self.speak_dialog('NotAccess')
 		return
@@ -555,7 +555,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	    status = event['status']
 	    summary = event['summary']
 
-    	    if (checkDescription(event)):
+    	    if (checkDescription(event) and not brief):
 		description = event['description'] 
 	    else:
 		description = ''
@@ -584,7 +584,7 @@ class GoogleCalendarSkill(MycroftSkill):
 		else:
 			complete_phrase = "You have a appointment "
 
-		complete_phrase = complete_phrase + rangeDate  + " from " + startHour + " at " + endHour + place 
+		complete_phrase = complete_phrase + rangeDate  + " from " + startHour + " until " + endHour + " at " + place 
 		complete_phrase = complete_phrase + ". About " + summary + ". " + description
 
 	    self.speak(complete_phrase)
@@ -641,7 +641,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	weekDayName = ""	# It's not necesary on this handle
         self.until_events(now, otherDateEnd(int(XDayAfter)),int(XDayAfter), weekDayName)
 
-    def until_events(self, startDate, stopDate, rangeDays, weekDayName):
+    def until_events(self, startDate, stopDate, rangeDays, weekDayName, brief=True):
 	self.speak_dialog('VerifyCalendar')
 	person = ""
 	eventWith = False
@@ -694,15 +694,15 @@ class GoogleCalendarSkill(MycroftSkill):
 	    		organizer = event['organizer']
 			if (len(organizer)) == 2:
 				phrase_part_1= organizer['displayName'] + " has scheduled a appointment for "
-				phrase_part_2= " begining at " + startHour + " and ending at " + endHour + place
+				phrase_part_2= " from " + startHour + " until " + endHour + place
 			elif (len(organizer)) == 3:
 				phrase_part_1 = "You have a appointment "
-				phrase_part_2= ", from " + startHour + " at " + endHour + place 
+				phrase_part_2= ", from " + startHour + " until " + endHour + " at " + place 
 
 	    		status = event['status']
 	    		summary = event['summary']
 
-    	    		if (checkDescription(event)):
+    	    		if (checkDescription(event) and not brief):
 				description = event['description'] 
 	    		else:
 				description = ''
