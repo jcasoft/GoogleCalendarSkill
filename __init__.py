@@ -145,11 +145,13 @@ def newDate(day,hours,minutes):
     return newDate
 
 def parse_datetime_string(string):
-    if '+' in string:
-	return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S+%f")
+    if 'T' in string:
+        if '+' in string:
+	    return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S+%f")
+        else:
+	    return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S-%f")
     else:
-	return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S-%f")
-
+	return datetime.datetime.strptime(string,"%Y-%m-%d")
 
 
 
@@ -478,6 +480,16 @@ class GoogleCalendarSkill(MycroftSkill):
 
 
 
+    def load_all_events(self, tMin=None, tMax=None):
+        calendars = self.service.calendarList().list().execute()
+        events = []
+        for calendar in calendars['items']:
+            eventsResult = self.service.events().list(
+                calendarId=calendar['id'], timeMin=tMin, timeMax=tMax, maxResults=self.maxResults, singleEvents=True,
+                orderBy='startTime').execute()
+            events.extend(eventsResult.get('items'))
+        events.sort(key=lambda x: x['start'])
+        return events
 
     def handle_next_event(self, message):
 	if not loggedIn():
@@ -490,10 +502,7 @@ class GoogleCalendarSkill(MycroftSkill):
 
 	self.speak_dialog('VerifyCalendar')
         now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-        eventsResult = self.service.events().list(
-            calendarId='primary', timeMin=now, maxResults=self.maxResults, singleEvents=True,
-            orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
+        events = self.load_all_events(tMin=now)
 
         if not events:
             self.speak_dialog('NoEvents')
@@ -650,8 +659,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	else:
 		evaluateWeekDay = False
 
-        eventsResult = self.service.events().list(calendarId='primary', timeMin=startDate, timeMax=stopDate,singleEvents=True, orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
+        events = self.load_all_events(tMin=startDate, tMax=stopDate)
 
 	today = datetime.datetime.strptime(time.strftime("%x"),"%m/%d/%y") 
     	tomorrow = today + datetime.timedelta(days=1)
