@@ -25,8 +25,10 @@ import sys
 import json
 from json import JSONEncoder
 import subprocess
-import tzlocal
+from tzlocal import get_localzone
 from astral import Astral
+
+import dateutil.parser
 
 logger = getLogger(dirname(__name__))
 sys.path.append(abspath(dirname(__file__)))
@@ -145,16 +147,11 @@ def newDate(day,hours,minutes):
     return newDate
 
 def parse_datetime_string(string):
+    logger.info('Parsing '+string)
     if 'T' in string:
-        if '+' in string:
-	    return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S+%f")
-        else:
-	    return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S-%f")
+        return dateutil.parser.parse(string)
     else:
-	return datetime.datetime.strptime(string,"%Y-%m-%d")
-
-
-
+        return dateutil.parser.parse(string + " 00:00:00 LOC", tzinfos={"LOC": get_localzone()})
 
 def checkLocation(eventDict):
     locationFlag = True if "location" in eventDict else False
@@ -488,7 +485,7 @@ class GoogleCalendarSkill(MycroftSkill):
                 calendarId=calendar['id'], timeMin=tMin, timeMax=tMax, maxResults=self.maxResults, singleEvents=True,
                 orderBy='startTime').execute()
             events.extend(eventsResult.get('items'))
-        events.sort(key=lambda x: x['start'])
+        events.sort(key=lambda x: parse_datetime_string(x['start'].get('dateTime', x['start'].get('date'))))
         return events
 
     def handle_next_event(self, message, brief=True):
@@ -501,19 +498,36 @@ class GoogleCalendarSkill(MycroftSkill):
 		where = ""
 
 	self.speak_dialog('VerifyCalendar')
-        now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-        events = self.load_all_events(tMin=now)
+        now = datetime.datetime.utcnow()
+        localNow = datetime.datetime.now(get_localzone())
+        # 'Z' indicates UTC time
+        events = self.load_all_events(tMin=now.isoformat() + 'Z')
 
         if not events:
             self.speak_dialog('NoEvents')
         else:
-            event = events[0]
-	    place = ''
+            # Events from the past that are still going on will be in here.
+            # Skip down to the appointment that really comes next.
+            nextEvent = None
+            start = None
+            place = ''
 	    description = ''
-            start = event['start'].get('dateTime', event['start'].get('date'))
-	    start = start[:22]+start[(22+1):]
-	    start = parse_datetime_string(start)
+            for event in events:
+                nextEvent = event
+                start = event['start'].get('dateTime', event['start'].get('date'))
+	        start = start[:22]+start[(22+1):]
+                logger.info('Considering event: '+ event['summary'] + ' ' + start)
+            for event in events:
+                nextEvent = event
+                start = event['start'].get('dateTime', event['start'].get('date'))
+	        start = start[:22]+start[(22+1):]
+	        start = parse_datetime_string(start)
+                if (start >= localNow):
+                   break
 
+            if (start < localNow):
+                self.speak_dialog('NoEvents')
+                return
 
 	    today = datetime.datetime.strptime(time.strftime("%x"),"%m/%d/%y") 
     	    tomorrow = today + datetime.timedelta(days=1)
