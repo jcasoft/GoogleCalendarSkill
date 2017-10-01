@@ -28,7 +28,7 @@ Inside mycroft virtual environment
 
 Now go to Mycroft third party skill directory
 
-    cd  $HOME/.mycroft/skills/GoogleCalendarSkill
+    cd  $HOME/.mycroft/skills/
 
     git clone  https://github.com/jcasoft/GoogleCalendarSkill.git GoogleCalendarSkill
 
