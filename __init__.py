@@ -25,8 +25,10 @@ import sys
 import json
 from json import JSONEncoder
 import subprocess
-import tzlocal
+from tzlocal import get_localzone
 from astral import Astral
+
+import dateutil.parser
 
 logger = getLogger(dirname(__name__))
 sys.path.append(abspath(dirname(__file__)))
@@ -145,14 +147,11 @@ def newDate(day,hours,minutes):
     return newDate
 
 def parse_datetime_string(string):
-    if '+' in string:
-	return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S+%f")
+    # logger.info('Parsing '+string)
+    if 'T' in string:
+        return dateutil.parser.parse(string)
     else:
-	return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S-%f")
-
-
-
-
+        return dateutil.parser.parse(string + " 00:00:00 LOC", tzinfos={"LOC": get_localzone()})
 
 def checkLocation(eventDict):
     locationFlag = True if "location" in eventDict else False
@@ -478,8 +477,19 @@ class GoogleCalendarSkill(MycroftSkill):
 
 
 
+    def load_all_events(self, tMin=None, tMax=None):
+        calendars = self.service.calendarList().list().execute()
+        events = []
+        for calendar in calendars['items']:
+            eventsResult = self.service.events().list(
+                calendarId=calendar['id'], timeMin=tMin, timeMax=tMax, maxResults=self.maxResults, singleEvents=True,
+                orderBy='startTime').execute()
+            events.extend(eventsResult.get('items'))
+        events.sort(key=lambda x: parse_datetime_string(x['start'].get('dateTime', x['start'].get('date'))))
+        return events
 
     def handle_next_event(self, message):
+        brief = True
 	if not loggedIn():
 		self.speak_dialog('NotAccess')
 		return
@@ -489,22 +499,36 @@ class GoogleCalendarSkill(MycroftSkill):
 		where = ""
 
 	self.speak_dialog('VerifyCalendar')
-        now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-        eventsResult = self.service.events().list(
-            calendarId='primary', timeMin=now, maxResults=self.maxResults, singleEvents=True,
-            orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
+        now = datetime.datetime.utcnow()
+        localNow = datetime.datetime.now(get_localzone())
+        # 'Z' indicates UTC time
+        events = self.load_all_events(tMin=now.isoformat() + 'Z')
 
         if not events:
             self.speak_dialog('NoEvents')
         else:
-            event = events[0]
-	    place = ''
+            # Events from the past that are still going on will be in here.
+            # Skip down to the appointment that really comes next.
+            nextEvent = None
+            start = None
+            place = ''
 	    description = ''
-            start = event['start'].get('dateTime', event['start'].get('date'))
-	    start = start[:22]+start[(22+1):]
-	    start = parse_datetime_string(start)
+            for event in events:
+                nextEvent = event
+                start = event['start'].get('dateTime', event['start'].get('date'))
+	        start = start[:22]+start[(22+1):]
+            #    logger.info('Considering event: '+ event.get('summary', 'busy') + ' ' + start)
+            for event in events:
+                nextEvent = event
+                start = event['start'].get('dateTime', event['start'].get('date'))
+	        start = start[:22]+start[(22+1):]
+	        start = parse_datetime_string(start)
+                if (start >= localNow):
+                   break
 
+            if (start < localNow):
+                self.speak_dialog('NoEvents')
+                return
 
 	    today = datetime.datetime.strptime(time.strftime("%x"),"%m/%d/%y") 
     	    tomorrow = today + datetime.timedelta(days=1)
@@ -544,9 +568,9 @@ class GoogleCalendarSkill(MycroftSkill):
 
 	    organizer = event['organizer']
 	    status = event['status']
-	    summary = event['summary']
+	    summary = event.get('summary', 'busy')
 
-    	    if (checkDescription(event)):
+    	    if (checkDescription(event) and not brief):
 		description = event['description'] 
 	    else:
 		description = ''
@@ -575,7 +599,7 @@ class GoogleCalendarSkill(MycroftSkill):
 		else:
 			complete_phrase = "You have a appointment "
 
-		complete_phrase = complete_phrase + rangeDate  + " from " + startHour + " at " + endHour + place 
+		complete_phrase = complete_phrase + rangeDate  + " from " + startHour + " until " + endHour + " at " + place 
 		complete_phrase = complete_phrase + ". About " + summary + ". " + description
 
 	    self.speak(complete_phrase)
@@ -632,7 +656,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	weekDayName = ""	# It's not necesary on this handle
         self.until_events(now, otherDateEnd(int(XDayAfter)),int(XDayAfter), weekDayName)
 
-    def until_events(self, startDate, stopDate, rangeDays, weekDayName):
+    def until_events(self, startDate, stopDate, rangeDays, weekDayName, brief=True):
 	self.speak_dialog('VerifyCalendar')
 	person = ""
 	eventWith = False
@@ -650,8 +674,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	else:
 		evaluateWeekDay = False
 
-        eventsResult = self.service.events().list(calendarId='primary', timeMin=startDate, timeMax=stopDate,singleEvents=True, orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
+        events = self.load_all_events(tMin=startDate, tMax=stopDate)
 
 	today = datetime.datetime.strptime(time.strftime("%x"),"%m/%d/%y") 
     	tomorrow = today + datetime.timedelta(days=1)
@@ -686,15 +709,15 @@ class GoogleCalendarSkill(MycroftSkill):
 	    		organizer = event['organizer']
 			if (len(organizer)) == 2:
 				phrase_part_1= organizer['displayName'] + " has scheduled a appointment for "
-				phrase_part_2= " begining at " + startHour + " and ending at " + endHour + place
+				phrase_part_2= " from " + startHour + " until " + endHour + place
 			elif (len(organizer)) == 3:
 				phrase_part_1 = "You have a appointment "
-				phrase_part_2= ", from " + startHour + " at " + endHour + place 
+				phrase_part_2= ", from " + startHour + " until " + endHour + " at " + place 
 
 	    		status = event['status']
 	    		summary = event['summary']
 
-    	    		if (checkDescription(event)):
+    	    		if (checkDescription(event) and not brief):
 				description = event['description'] 
 	    		else:
 				description = ''
