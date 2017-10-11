@@ -147,7 +147,7 @@ def newDate(day,hours,minutes):
     return newDate
 
 def parse_datetime_string(string):
-    logger.info('Parsing '+string)
+    # logger.info('Parsing '+string)
     if 'T' in string:
         return dateutil.parser.parse(string)
     else:
@@ -488,7 +488,8 @@ class GoogleCalendarSkill(MycroftSkill):
         events.sort(key=lambda x: parse_datetime_string(x['start'].get('dateTime', x['start'].get('date'))))
         return events
 
-    def handle_next_event(self, message, brief=True):
+    def handle_next_event(self, message):
+        brief = True
 	if not loggedIn():
 		self.speak_dialog('NotAccess')
 		return
@@ -516,7 +517,7 @@ class GoogleCalendarSkill(MycroftSkill):
                 nextEvent = event
                 start = event['start'].get('dateTime', event['start'].get('date'))
 	        start = start[:22]+start[(22+1):]
-                logger.info('Considering event: '+ event['summary'] + ' ' + start)
+            #    logger.info('Considering event: '+ event.get('summary', 'busy') + ' ' + start)
             for event in events:
                 nextEvent = event
                 start = event['start'].get('dateTime', event['start'].get('date'))
@@ -567,7 +568,7 @@ class GoogleCalendarSkill(MycroftSkill):
 
 	    organizer = event['organizer']
 	    status = event['status']
-	    summary = event['summary']
+	    summary = event.get('summary', 'busy')
 
     	    if (checkDescription(event) and not brief):
 		description = event['description'] 
