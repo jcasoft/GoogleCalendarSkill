@@ -25,8 +25,10 @@ import sys
 import json
 from json import JSONEncoder
 import subprocess
-import tzlocal
+from tzlocal import get_localzone
 from astral import Astral
+
+import dateutil.parser
 
 logger = getLogger(dirname(__name__))
 sys.path.append(abspath(dirname(__file__)))
@@ -53,8 +55,8 @@ Check the location of the Mycroft third_party Skill
 ****************************************************
 """
 python_out 		=  "/usr/bin/python2.7"
-third_party_skill	= expanduser("~")+"/.mycroft/skills/GoogleCalendarSkill/"
-effects 		= third_party_skill + "effects/"
+third_party_skill	= dir_path = os.path.dirname(os.path.realpath(__file__))
+effects 		= third_party_skill + "/effects/"
 
 
 attendees_own_Email=[]
@@ -145,14 +147,11 @@ def newDate(day,hours,minutes):
     return newDate
 
 def parse_datetime_string(string):
-    if '+' in string:
-	return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S+%f")
+    # logger.info('Parsing '+string)
+    if 'T' in string:
+        return dateutil.parser.parse(string)
     else:
-	return datetime.datetime.strptime(string,"%Y-%m-%dT%H:%M:%S-%f")
-
-
-
-
+        return dateutil.parser.parse(string + " 00:00:00 LOC", tzinfos={"LOC": get_localzone()})
 
 def checkLocation(eventDict):
     locationFlag = True if "location" in eventDict else False
@@ -194,8 +193,8 @@ def getMonth(month):
     return months.index(month)+1
 
 def getDescription(word):
-	#hours_check= ["one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"]
-	hours_check= ["one ","two ","three ","four ","five ","six ","seven ","eight ","nine ","ten ","eleven ","twelve ","thirteen ","fourteen ","fifteen ","sixteen ","seventeen ","eighteen ","nineteen ","twenty ", "am ","pm ", "AM ","PM "]
+	hours_check= ["one ","two ","three ","four ","five ","six ","seven ","eight ","nine ","ten ","eleven ", \
+                     "twelve ","thirteen ","fourteen ","fifteen ","sixteen ","seventeen ","eighteen ","nineteen ","twenty ", "am ","pm ", "AM ","PM "]
 	found = False
 	wordNew = word + " "
 	if filter(lambda x: wordNew in x, hours_check):
@@ -268,8 +267,10 @@ class GoogleCalendarSkill(MycroftSkill):
 
 	"""
 	Run add event to calendar outside Mycroft Virtual Environment 
+
     	"""
-	addCalendar_cmd = python_out + " " + third_party_skill + "addCalendar.py %r" % json.dumps(event_json)
+	addCalendar_cmd = python_out + " " + third_party_skill + "/addCalendar.py %r" % json.dumps(event_json)
+
 	print os.popen(addCalendar_cmd).read()
 
 	return msg
@@ -359,12 +360,21 @@ class GoogleCalendarSkill(MycroftSkill):
         self.emitter.on(self.name + '.google_calendar',self.google_calendar)
         self.emitter.emit(Message(self.name + '.google_calendar'))
 
-
-        intent = IntentBuilder('WhenEventsIntent')\
+        intent = IntentBuilder('WhenEventsFutureIntent')\
             .require('WhenKeyword') \
+            .require('IsKeyword') \
 	    .require('Ask') \
             .build()
-        self.register_intent(intent, self.handle_when_event)
+        self.register_intent(intent, self.handle_when_event_future)
+	"""
+
+        intent = IntentBuilder('WhenEventsFutureIntent')\
+            .require('DateKeyword') \
+            .require('OfKeyword') \
+            .require('TheKeyword') \
+            .build()
+        self.register_intent(intent, self.handle_when_event_future)
+	"""
 
 	# *****************************************************
 	# Add event Intent to Calendar Section
@@ -477,9 +487,19 @@ class GoogleCalendarSkill(MycroftSkill):
         self.register_intent(intent, self.handle_xdays_events)
 
 
-
+    def load_all_events(self, tMin=None, tMax=None):
+        calendars = self.service.calendarList().list().execute()
+        events = []
+        for calendar in calendars['items']:
+            eventsResult = self.service.events().list(
+                calendarId=calendar['id'], timeMin=tMin, timeMax=tMax, maxResults=self.maxResults, singleEvents=True,
+                orderBy='startTime').execute()
+            events.extend(eventsResult.get('items'))
+        events.sort(key=lambda x: parse_datetime_string(x['start'].get('dateTime', x['start'].get('date'))))
+        return events
 
     def handle_next_event(self, message):
+        brief = True
 	if not loggedIn():
 		self.speak_dialog('NotAccess')
 		return
@@ -489,22 +509,36 @@ class GoogleCalendarSkill(MycroftSkill):
 		where = ""
 
 	self.speak_dialog('VerifyCalendar')
-        now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-        eventsResult = self.service.events().list(
-            calendarId='primary', timeMin=now, maxResults=self.maxResults, singleEvents=True,
-            orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
+        now = datetime.datetime.utcnow()
+        localNow = datetime.datetime.now(get_localzone())
+        # 'Z' indicates UTC time
+        events = self.load_all_events(tMin=now.isoformat() + 'Z')
 
         if not events:
             self.speak_dialog('NoEvents')
         else:
-            event = events[0]
-	    place = ''
+            # Events from the past that are still going on will be in here.
+            # Skip down to the appointment that really comes next.
+            nextEvent = None
+            start = None
+            place = ''
 	    description = ''
-            start = event['start'].get('dateTime', event['start'].get('date'))
-	    start = start[:22]+start[(22+1):]
-	    start = parse_datetime_string(start)
+            for event in events:
+                nextEvent = event
+                start = event['start'].get('dateTime', event['start'].get('date'))
+	        start = start[:22]+start[(22+1):]
+            #    logger.info('Considering event: '+ event.get('summary', 'busy') + ' ' + start)
+            for event in events:
+                nextEvent = event
+                start = event['start'].get('dateTime', event['start'].get('date'))
+	        start = start[:22]+start[(22+1):]
+	        start = parse_datetime_string(start)
+                if (start >= localNow):
+                   break
 
+            if (start < localNow):
+                self.speak_dialog('NoEvents')
+                return
 
 	    today = datetime.datetime.strptime(time.strftime("%x"),"%m/%d/%y") 
     	    tomorrow = today + datetime.timedelta(days=1)
@@ -544,9 +578,9 @@ class GoogleCalendarSkill(MycroftSkill):
 
 	    organizer = event['organizer']
 	    status = event['status']
-	    summary = event['summary']
+	    summary = event.get('summary', 'busy')
 
-    	    if (checkDescription(event)):
+    	    if (checkDescription(event) and not brief):
 		description = event['description'] 
 	    else:
 		description = ''
@@ -575,7 +609,7 @@ class GoogleCalendarSkill(MycroftSkill):
 		else:
 			complete_phrase = "You have a appointment "
 
-		complete_phrase = complete_phrase + rangeDate  + " from " + startHour + " at " + endHour + place 
+		complete_phrase = complete_phrase + rangeDate  + " from " + startHour + " until " + endHour + " at " + place 
 		complete_phrase = complete_phrase + ". About " + summary + ". " + description
 
 	    self.speak(complete_phrase)
@@ -632,7 +666,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	weekDayName = ""	# It's not necesary on this handle
         self.until_events(now, otherDateEnd(int(XDayAfter)),int(XDayAfter), weekDayName)
 
-    def until_events(self, startDate, stopDate, rangeDays, weekDayName):
+    def until_events(self, startDate, stopDate, rangeDays, weekDayName, brief=True):
 	self.speak_dialog('VerifyCalendar')
 	person = ""
 	eventWith = False
@@ -650,8 +684,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	else:
 		evaluateWeekDay = False
 
-        eventsResult = self.service.events().list(calendarId='primary', timeMin=startDate, timeMax=stopDate,singleEvents=True, orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
+        events = self.load_all_events(tMin=startDate, tMax=stopDate)
 
 	today = datetime.datetime.strptime(time.strftime("%x"),"%m/%d/%y") 
     	tomorrow = today + datetime.timedelta(days=1)
@@ -686,15 +719,15 @@ class GoogleCalendarSkill(MycroftSkill):
 	    		organizer = event['organizer']
 			if (len(organizer)) == 2:
 				phrase_part_1= organizer['displayName'] + " has scheduled a appointment for "
-				phrase_part_2= " begining at " + startHour + " and ending at " + endHour + place
+				phrase_part_2= " from " + startHour + " until " + endHour + place
 			elif (len(organizer)) == 3:
 				phrase_part_1 = "You have a appointment "
-				phrase_part_2= ", from " + startHour + " at " + endHour + place 
+				phrase_part_2= ", from " + startHour + " until " + endHour + " at " + place 
 
 	    		status = event['status']
 	    		summary = event['summary']
 
-    	    		if (checkDescription(event)):
+    	    		if (checkDescription(event) and not brief):
 				description = event['description'] 
 	    		else:
 				description = ''
@@ -1174,13 +1207,15 @@ class GoogleCalendarSkill(MycroftSkill):
 		self.speak(addCalendar)
 
 
-    def handle_when_event(self, message):
+    def handle_when_event_future(self, message):
 	if not loggedIn():
 		self.speak_dialog('NotAccess')
 		return
 
-	when_key = message.data.get("WhenKeyword")
-	ask_word = message.data.get("Ask")
+	#when_key = message.data.get("WhenKeyword")
+	ask_word = message.data.get("utterance")
+
+	logger.info('***** WHEN EVENT ='+ask_word)
 
 
 	if ("end of the world" in ask_word) or ("apocalypse" in ask_word) or ("final of the world" in ask_word) :
@@ -1191,6 +1226,7 @@ class GoogleCalendarSkill(MycroftSkill):
 		play_mp3(effects+"judgment_day.mp3")
 		time.sleep(16)
 		self.speak_dialog('JudgmentDay')
+
 
 
 def create_skill():
