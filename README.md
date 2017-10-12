@@ -41,9 +41,12 @@ Authorize Google Calendar Skill in distro with local web browser, wait web brows
     python GoogleCalendarSkill
 
 
-Edit your ~/.mycroft/mycroft.conf
+Edit your mycroft.conf
+on "GoogleCalendarSkill"  edit your options (added automatically)
 
-on "GoogleCalendarSkill" section (added automatically)
+     cd /home/mycroft/.mycroft
+     sudo nano mycroft.conf
+
 
 
 
@@ -85,10 +88,14 @@ Then copy the following files and fix the permissions
      sudo chmod -R 777 /home/mycroft/.credentials
 
      sudo cp /home/pi/.mycroft/mycroft.conf /home/mycroft/.mycroft/mycroft.conf
-     sudo chmod -R 777 /home/pi/.mycroft
+     sudo chmod -R 777 /home/mycroft/.mycroft
 
-Edit your ~/.mycroft/mycroft.conf with sudo (sudo nano ~/.mycroft/mycroft.conf)
-on "GoogleCalendarSkill"  edit your options
+Edit your mycroft.conf
+on "GoogleCalendarSkill"  edit your options (added automatically)
+
+     cd /home/mycroft/.mycroft
+     sudo nano mycroft.conf
+
 
 
 Restart Mycroft
