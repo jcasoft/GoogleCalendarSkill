@@ -14,6 +14,7 @@
 import sys
 import os
 import datetime
+import dateutil.parser
 import time
 path = os.path.dirname(sys.modules[__name__].__file__)
 path = os.path.join(path, '..')
@@ -82,12 +83,9 @@ for event in events:
     start = start[:22]+start[(22+1):]
 
     if 'T' in start:
-        if '+' in start:
-	    start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S+%f")
-        else:
-	    start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S-%f")
+        start =  dateutil.parser.parse(start)
     else:
-	start = datetime.datetime.strptime(start,"%Y-%m-%d")
+        start =  dateutil.parser.parse(start + " 00:00:00 LOC", tzinfos={"LOC": get_localzone()})
 
     startHour = ("{:d}:{:02d}".format(start.hour, start.minute))
     startHour = time.strptime(startHour,"%H:%M")

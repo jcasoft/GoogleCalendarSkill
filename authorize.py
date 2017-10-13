@@ -30,6 +30,7 @@ import time
 from collections import OrderedDict
 from HTMLParser import HTMLParser
 import datetime
+import dateutil.parser
 
 __author__ = 'jcasoft'
 
@@ -127,10 +128,12 @@ for event in events:
 
     start = start[:22]+start[(22+1):]
 
-    if '+' in start:
-	start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S+%f")
+    if 'T' in start:
+        start =  dateutil.parser.parse(start)
     else:
-	start = datetime.datetime.strptime(start,"%Y-%m-%dT%H:%M:%S-%f")
+        start =  dateutil.parser.parse(start + " 00:00:00 LOC", tzinfos={"LOC": get_localzone()})
+
+
 
     startHour = ("{:d}:{:02d}".format(start.hour, start.minute))
     startHour = time.strptime(startHour,"%H:%M")

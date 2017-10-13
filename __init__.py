@@ -33,7 +33,7 @@ import dateutil.parser
 logger = getLogger(dirname(__name__))
 sys.path.append(abspath(dirname(__file__)))
 
-__author__ = 'j c a soft'
+__author__ = 'jcasoft'
 
 SCOPES = 'https://www.googleapis.com/auth/calendar'
 CID = "992603803855-06urqkqae0trrr2dfte4vljmj8ts2om2.apps.googleusercontent.com"
