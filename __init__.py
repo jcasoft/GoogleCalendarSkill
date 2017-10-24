@@ -585,7 +585,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	    else:
 		description = ''
  
-	    if (len(organizer)) == 2:
+	    if (len(organizer) and 'displayName' in organizer) == 2:
 		organizer = organizer['displayName']
 		if (where.upper() == "WHERE"):
 			if (len(place) > 3):
@@ -599,7 +599,8 @@ class GoogleCalendarSkill(MycroftSkill):
 		complete_phrase = complete_phrase + rangeDate  + " begining at " + startHour + " and ending at " + endHour + place
 		complete_phrase = complete_phrase + ". About " + summary + ". " + description
 
-	    elif (len(organizer)) == 3:
+#	    elif (len(organizer)) == 3:
+	    else:
 		if (where.upper() == "WHERE"):
 			if (len(place) > 3):
 				complete_phrase = "Your next appointment will be" + place + " "
@@ -717,10 +718,11 @@ class GoogleCalendarSkill(MycroftSkill):
 	    		else:
 				place =  ""
 	    		organizer = event['organizer']
-			if (len(organizer)) == 2:
+			if (len(organizer)) == 2 and 'displayName' in organizer:
 				phrase_part_1= organizer['displayName'] + " has scheduled a appointment for "
 				phrase_part_2= " from " + startHour + " until " + endHour + place
-			elif (len(organizer)) == 3:
+#			elif (len(organizer)) == 3:
+			else:
 				phrase_part_1 = "You have a appointment "
 				phrase_part_2= ", from " + startHour + " until " + endHour + " at " + place 
 
