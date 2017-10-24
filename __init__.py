@@ -585,7 +585,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	    else:
 		description = ''
  
-	    if (len(organizer) and 'displayName' in organizer) == 2:
+	    if (len(organizer) == 2 and 'displayName' in organizer):
 		organizer = organizer['displayName']
 		if (where.upper() == "WHERE"):
 			if (len(place) > 3):
