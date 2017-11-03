@@ -29,7 +29,7 @@ Manual Method not for Mark1
     sudo pip install -r requirements.txt
 
 
-Authorize Google Calendar not for Mark1
+Authorize Google Calendar not for Mark1 after install
 -------------------
 
 Authorize Google Calendar Skill in distro with local web browser, wait web browse open and select "Allow"
@@ -61,7 +61,7 @@ Manual Method for Mark1
     sudo pip install -r requirements.txt
 
 
-Authorize Google Calendar for Mark1
+Authorize Google Calendar for Mark1  after install
 -------------------
 	
 Authorize GoogleCalendarSkill in Mark1 without local web browser
