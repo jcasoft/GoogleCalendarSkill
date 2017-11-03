@@ -585,7 +585,7 @@ class GoogleCalendarSkill(MycroftSkill):
 	    else:
 		description = ''
  
-	    if (len(organizer)) == 2:
+	    if (len(organizer) == 2 and 'displayName' in organizer):
 		organizer = organizer['displayName']
 		if (where.upper() == "WHERE"):
 			if (len(place) > 3):
@@ -599,7 +599,8 @@ class GoogleCalendarSkill(MycroftSkill):
 		complete_phrase = complete_phrase + rangeDate  + " begining at " + startHour + " and ending at " + endHour + place
 		complete_phrase = complete_phrase + ". About " + summary + ". " + description
 
-	    elif (len(organizer)) == 3:
+#	    elif (len(organizer)) == 3:
+	    else:
 		if (where.upper() == "WHERE"):
 			if (len(place) > 3):
 				complete_phrase = "Your next appointment will be" + place + " "
@@ -693,6 +694,7 @@ class GoogleCalendarSkill(MycroftSkill):
         if not events:
 		self.speak_dialog('NoEvents')
         else:
+		final_phrase = "";
 		for event in events:
 			start = event['start'].get('dateTime', event['start'].get('date'))
 			start = start[:22]+start[(22+1):]
@@ -713,16 +715,9 @@ class GoogleCalendarSkill(MycroftSkill):
 	    			location = event['location']
 	    			location = location.splitlines()
 	    			place_city = ','.join(location[:1])
-				place =  " on " + place_city 
+				place =  place_city 
 	    		else:
 				place =  ""
-	    		organizer = event['organizer']
-			if (len(organizer)) == 2:
-				phrase_part_1= organizer['displayName'] + " has scheduled a appointment for "
-				phrase_part_2= " from " + startHour + " until " + endHour + place
-			elif (len(organizer)) == 3:
-				phrase_part_1 = "You have a appointment "
-				phrase_part_2= ", from " + startHour + " until " + endHour + " at " + place 
 
 	    		status = event['status']
 	    		summary = event['summary']
@@ -731,73 +726,80 @@ class GoogleCalendarSkill(MycroftSkill):
 				description = event['description'] 
 	    		else:
 				description = ''
+	    		organizer = event['organizer']
 
-			phrase_part_3= ". About " + summary + ". " + description
+	    		dialog = "YourAppointment"
+	    		# omit description for now
+	    		params = {'startHour': startHour, 'endHour': endHour, 'title': summary}
+			if (len(organizer)) == 2 and 'displayName' in organizer:
+				dialog = "ScheduledAppointment"
+				params['organizer'] = organizer['displayName']
+			if startHour == endHour == "12:00 AM":
+				dialog += ".WholeDay"
+			if place:
+				dialog += ".WithPlace"
+				params['place'] = place
+
 
 			if (rangeDays == 0):		# compare the same day
 				if (date_compare == today):
-					rangeDate = "today"		
-					complete_phrase = phrase_part_1 + rangeDate  + phrase_part_2 + phrase_part_3
-	    				self.speak(complete_phrase)
+					params['rangeDate'] = "today"		
+					final_phrase += "\n\n"+self.dialog_renderer.render(dialog, params)
 
 			elif (rangeDays == 1 ):		# compare the next dayadd new event from 8:30 am to 11:45 am almuerzo con Gianluca despues de la fundacion
 				if (date_compare == tomorrow):
-					rangeDate = "tomorrow"		
-					complete_phrase = phrase_part_1 + rangeDate  + phrase_part_2 + phrase_part_3
-	    				self.speak(complete_phrase)
+					params['rangeDate'] = "tomorrow"		
+					final_phrase += "\n\n"+self.dialog_renderer.render(dialog, params)
 
 			elif (rangeDays == 2 ):		# compare until the next day
 				if (date_compare <= tomorrow):
 					rangeDate = "today"
 					if (date_compare == today):
-						rangeDate = "today"
+						params['rangeDate'] = "today"
 					elif (date_compare == tomorrow):
-						rangeDate = "tomorrow"
-					complete_phrase = phrase_part_1 + rangeDate  + phrase_part_2 + phrase_part_3
-					self.speak(complete_phrase)
+						params['rangeDate'] = "tomorrow"
+					final_phrase += "\n\n"+self.dialog_renderer.render(dialog, params)
 
 			elif (evaluateWeekDay):		# compare the day name
 				day_name_compare = (calendar.day_name[start.weekday()])
 				if (day_name_compare.upper() == weekDayName.upper()):
 					day = str(start.day)
 					month_name = (calendar.month_name[start.month])
-					rangeDate = weekDayName + ", " + month_name + " " + day
-					complete_phrase = phrase_part_1 + rangeDate  + phrase_part_2 + phrase_part_3
-					self.speak(complete_phrase)
+					params['rangeDate'] = weekDayName + ", " + month_name + " " + day
+					final_phrase += "\n\n"+self.dialog_renderer.render(dialog, params)
 
 			elif (evaluatePerson):		# find a person name on summary
 				if person.upper() in summary.upper():
 					rangeDate = "today"
 					if (date_compare == today):
-						rangeDate = "today"
+						params['rangeDate'] = "today"
 					elif (date_compare == tomorrow):
-						rangeDate = "tomorrow"
+						params['rangeDate'] = "tomorrow"
 					else:
 						month_name = (calendar.month_name[start.month])
 						day_name = (calendar.day_name[start.weekday()])
 						day = str(start.day)
-						rangeDate = day_name + ", " + month_name + " " + day
+						params['rangeDate'] = day_name + ", " + month_name + " " + day
 				
-					complete_phrase = phrase_part_1 + " with " + person + " " + rangeDate  + phrase_part_2 + phrase_part_3
-					self.speak(complete_phrase)
+					final_phrase += "\n\n"+self.dialog_renderer.render(dialog, params)
+					final_phrase += ", " + self.dialog_renderer.render("With", {'accomplices': person})
 					eventWith = True
 
 			elif (rangeDays >2 ):		# compare until the nexts x days
 				if (date_compare <= other_date):
 					rangeDate = "today"
 					if (date_compare == today):
-						rangeDate = "today"
+						params['rangeDate'] = "today"
 					elif (date_compare == tomorrow):
-						rangeDate = "tomorrow"
+						params['rangeDate'] = "tomorrow"
 					else:
 						month_name = (calendar.month_name[start.month])
 						day_name = (calendar.day_name[start.weekday()])
 						day = str(start.day)
-						rangeDate = day_name + ", " + month_name + " " + day
+						params['rangeDate'] = day_name + ", " + month_name + " " + day
 
-					complete_phrase = phrase_part_1 + rangeDate  + phrase_part_2 + phrase_part_3
-					self.speak(complete_phrase)
-			
+					final_phrase += "\n\n"+self.dialog_renderer.render(dialog, params)
+		self.speak(final_phrase)
 		if not eventWith and evaluatePerson :
 			self.speak("You have not scheduled appointments with " + person + " in the next " + str(rangeDays) + " days")
 
